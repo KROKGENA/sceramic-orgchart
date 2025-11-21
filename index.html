@@ -94,17 +94,22 @@
       inset: 0;
       width: 100%;
       height: 100%;
-      pointer-events: none; /* не мешаем мышке по блокам */
+    }
+
+    /* Чтобы по линиям можно было кликать */
+    #links-layer line {
+      pointer-events: stroke;
     }
   </style>
 </head>
 <body>
   <div class="page">
     <div class="toolbar">
-      Перетаскивайте блоки мышкой. В режиме стрелок клик по двум блокам рисует стрелку.
+      Перетаскивайте блоки мышкой.
       <button id="toggle-grid">Сетка: выкл</button>
       <button id="toggle-arrows">Режим стрелок: выкл</button>
-      <button id="clear-arrows">Очистить стрелки</button>
+      <button id="toggle-delete-arrows">Удалять стрелки: выкл</button>
+      <button id="clear-arrows">Очистить все стрелки</button>
       <button id="reset">Сбросить расположение</button>
     </div>
 
@@ -313,6 +318,7 @@
 
     let gridOn = false;
     let arrowMode = false;
+    let deleteArrowMode = false;
     let arrowStartNode = null;
 
     const edges = []; // {fromId, toId, line}
@@ -480,6 +486,19 @@
       svg.appendChild(line);
 
       const edge = {fromId, toId, line};
+
+      // клик по линии — удаление при включённом режиме
+      line.addEventListener('click', (e) => {
+        if (!deleteArrowMode) return;
+        e.stopPropagation();
+        const idx = edges.indexOf(edge);
+        if (idx !== -1) {
+          edges.splice(idx, 1);
+        }
+        line.remove();
+        saveEdges();
+      });
+
       edges.push(edge);
       updateEdge(edge);
       saveEdges();
@@ -498,10 +517,6 @@
 
     function clearEdges() {
       edges.splice(0, edges.length);
-      while (svg.lastChild && svg.lastChild.nodeName === 'line') {
-        svg.removeChild(svg.lastChild);
-      }
-      // безопасно: просто очищаем всё, кроме <defs>
       Array.from(svg.querySelectorAll('line')).forEach(l => l.remove());
       localStorage.removeItem(storageKeyEdges);
     }
@@ -513,7 +528,7 @@
 
     nodes.forEach(node => {
       node.addEventListener('pointerdown', (e) => {
-        if (arrowMode) return; // в режиме стрелок не таскаем
+        if (arrowMode || deleteArrowMode) return; // в режимах стрелок не таскаем
         active = node;
         active.setPointerCapture(e.pointerId);
         const rect = active.getBoundingClientRect();
@@ -532,7 +547,7 @@
         }
       });
 
-      // клик для стрелок
+      // клик для рисования стрелок
       node.addEventListener('click', (e) => {
         if (!arrowMode) return;
         e.stopPropagation();
@@ -579,11 +594,28 @@
 
     document.getElementById('toggle-arrows').addEventListener('click', (e) => {
       arrowMode = !arrowMode;
+      if (arrowMode) {
+        deleteArrowMode = false;
+        document.getElementById('toggle-delete-arrows').textContent = 'Удалять стрелки: выкл';
+      }
       if (!arrowMode && arrowStartNode) {
         arrowStartNode.classList.remove('selected');
         arrowStartNode = null;
       }
       e.target.textContent = 'Режим стрелок: ' + (arrowMode ? 'вкл' : 'выкл');
+    });
+
+    document.getElementById('toggle-delete-arrows').addEventListener('click', (e) => {
+      deleteArrowMode = !deleteArrowMode;
+      if (deleteArrowMode) {
+        arrowMode = false;
+        document.getElementById('toggle-arrows').textContent = 'Режим стрелок: выкл';
+        if (arrowStartNode) {
+          arrowStartNode.classList.remove('selected');
+          arrowStartNode = null;
+        }
+      }
+      e.target.textContent = 'Удалять стрелки: ' + (deleteArrowMode ? 'вкл' : 'выкл');
     });
 
     document.getElementById('clear-arrows').addEventListener('click', () => {
