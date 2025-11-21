@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Оргструктура компании</title>
+  <style>
+    /* Параметры печати под А4, книжная, поля */
+    @page {
+      size: A4 portrait;
+      margin: 15mm;
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+                   Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: #ffffff;
+      color: #000000;
+    }
+
+    .page {
+      width: 210mm;
+      height: 297mm;
+      margin: 0 auto;
+      box-sizing: border-box;
+      padding: 10mm;
+    }
+
+    .toolbar {
+      font-size: 10px;
+      margin-bottom: 4mm;
+    }
+
+    .toolbar button {
+      padding: 2px 8px;
+      font-size: 10px;
+      cursor: pointer;
+      margin-right: 4px;
+    }
+
+    .canvas {
+      position: relative;
+      width: 100%;
+      height: calc(100% - 14mm);
+      border: 1px solid #000;
+      box-sizing: border-box;
+      background: #ffffff;
+      overflow: hidden;
+    }
+
+    /* Сетка (вкл/выкл по классу grid-on) */
+    .canvas.grid-on {
+      background-image:
+        linear-gradient(to right, #e0e0e0 1px, transparent 1px),
+        linear-gradient(to bottom, #e0e0e0 1px, transparent 1px);
+      background-size: 10mm 10mm;
+    }
+
+    .node {
+      position: absolute;
+      min-width: 70px;
+      max-width: 150px;
+      padding: 4px 6px;
+      border: 1px solid #000;
+      border-radius: 3px;
+      background: #ffffff;
+      box-sizing: border-box;
+      font-size: 9px;
+      line-height: 1.2;
+      text-align: center;
+      cursor: move;
+      user-select: none;
+    }
+
+    .node strong {
+      display: block;
+      margin-bottom: 1px;
+      font-size: 9.5px;
+    }
+
+    .sub {
+      display: block;
+      font-size: 8px;
+      margin-top: 1px;
+    }
+
+    .node.selected {
+      border-width: 2px;
+    }
+
+    /* Слой для стрелок */
+    #links-layer {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none; /* не мешаем мышке по блокам */
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="toolbar">
+      Перетаскивайте блоки мышкой. В режиме стрелок клик по двум блокам рисует стрелку.
+      <button id="toggle-grid">Сетка: выкл</button>
+      <button id="toggle-arrows">Режим стрелок: выкл</button>
+      <button id="clear-arrows">Очистить стрелки</button>
+      <button id="reset">Сбросить расположение</button>
+    </div>
+
+    <div class="canvas" id="canvas">
+      <!-- слой со стрелками -->
+      <svg id="links-layer">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5"
+                  markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#000"></path>
+          </marker>
+        </defs>
+      </svg>
+
+      <!-- Верхний уровень -->
+      <div class="node" id="n-gd">
+        <strong>Генеральный директор</strong>
+      </div>
+
+      <div class="node" id="n-komdir">
+        <strong>Коммерческий директор</strong>
+        <span class="sub">Коммерческий блок</span>
+      </div>
+
+      <div class="node" id="n-opdir">
+        <strong>Операционный директор</strong>
+        <span class="sub">Продажи, клиенты, проекты</span>
+      </div>
+
+      <div class="node" id="n-hrdir">
+        <strong>Директор по персоналу</strong>
+        <span class="sub">HR</span>
+      </div>
+
+      <div class="node" id="n-logdir">
+        <strong>Директор по логистике</strong>
+        <span class="sub">Логистика и склад</span>
+      </div>
+
+      <div class="node" id="n-purdir">
+        <strong>Директор по закупкам</strong>
+        <span class="sub">Отдел закупок</span>
+      </div>
+
+      <div class="node" id="n-sec">
+        Специалист по безопасности<br>и внутреннему контролю
+      </div>
+
+      <div class="node" id="n-office">
+        Офис-менеджер
+      </div>
+
+      <!-- Закупки -->
+      <div class="node" id="n-pur-mgrs">
+        Менеджер по закупкам<br>(3 ставки)
+      </div>
+
+      <!-- Продажи, клиенты, маркетинг (под Операционным) -->
+      <div class="node" id="n-dept-regsales">
+        Руководитель отдела<br>региональных продаж
+      </div>
+      <div class="node" id="n-reg-mgrs">
+        Региональный менеджер<br>(4 ставки)
+      </div>
+
+      <div class="node" id="n-head-cust">
+        Начальник отдела<br>по работе с клиентами
+      </div>
+      <div class="node" id="n-cust-mgrs">
+        Менеджеры по работе<br>с клиентами (7)
+      </div>
+      <div class="node" id="n-claims">
+        Менеджер по рекламациям
+      </div>
+      <div class="node" id="n-atlas-cust">
+        Менеджер Atlas Plan
+      </div>
+      <div class="node" id="n-shop-mgrs">
+        Менеджеры торгового зала (2)
+      </div>
+
+      <div class="node" id="n-lead-projects">
+        Ведущий менеджер<br>по работе с проектами
+      </div>
+
+      <div class="node" id="n-head-mkt">
+        Руководитель отдела<br>маркетинга и рекламы
+      </div>
+      <div class="node" id="n-spec-mkt">
+        Специалист отдела<br>маркетинга и рекламы
+      </div>
+
+      <div class="node" id="n-head-dig">
+        Руководитель направления<br>цифровой трансформации
+      </div>
+      <div class="node" id="n-dev-1c">
+        Программист-разработчик 1С
+      </div>
+      <div class="node" id="n-admin-it">
+        Системный администратор
+      </div>
+
+      <!-- Логистика и склад -->
+      <div class="node" id="n-head-opslog">
+        Руководитель по операционной логистике<br>и системному взаимодействию
+      </div>
+      <div class="node" id="n-log-mgr">
+        Менеджер по логистике
+      </div>
+      <div class="node" id="n-log-cust">
+        Менеджер по работе с клиентами<br>(логистика)
+      </div>
+      <div class="node" id="n-head-warehouse">
+        Начальник склада
+      </div>
+      <div class="node" id="n-receiver">
+        Приёмщик товара
+      </div>
+      <div class="node" id="n-doc-senior">
+        Старший специалист<br>по документообороту
+      </div>
+      <div class="node" id="n-doc-spec">
+        Специалист по документообороту
+      </div>
+      <div class="node" id="n-shift-lead">
+        Старший смены склада
+      </div>
+      <div class="node" id="n-loaders">
+        Грузчики
+      </div>
+      <div class="node" id="n-forklift">
+        Водители погрузчиков
+      </div>
+      <div class="node" id="n-pickers">
+        Комплектовщики
+      </div>
+      <div class="node" id="n-controllers">
+        Контролёры
+      </div>
+
+      <!-- Москва -->
+      <div class="node" id="n-moscow">
+        ООО «СервисКерамика»<br>г. Москва
+      </div>
+      <div class="node" id="n-moscow-head-atlas">
+        Руководитель направления<br>продаж Atlas Plan
+      </div>
+      <div class="node" id="n-moscow-sales">
+        Менеджеры по продажам<br>(3 ставки)
+      </div>
+      <div class="node" id="n-moscow-manager">
+        Менеджер
+      </div>
+
+      <div class="node" id="n-moscow-dealer-head">
+        Региональный менеджер –<br>руководитель отдела<br>дилерских продаж
+      </div>
+      <div class="node" id="n-moscow-dealer-reg">
+        Региональные менеджеры<br>дилерских продаж (2)
+      </div>
+
+      <div class="node" id="n-moscow-proj-head">
+        Руководитель отдела<br>проектов (Москва)
+      </div>
+      <div class="node" id="n-moscow-proj-reg">
+        Региональный менеджер<br>по проектам
+      </div>
+
+      <!-- СПб -->
+      <div class="node" id="n-spb">
+        ООО «СервисКерамика»<br>г. Санкт-Петербург
+      </div>
+      <div class="node" id="n-spb-reg">
+        Региональные менеджеры<br>(2 ставки)
+      </div>
+
+      <!-- Аутсорсинг -->
+      <div class="node" id="n-outs">
+        ООО «Бухгалтер»
+      </div>
+      <div class="node" id="n-outs-dep">
+        Заместитель ген. директора<br>по правовым вопросам
+      </div>
+      <div class="node" id="n-outs-chief">
+        Главный бухгалтер
+      </div>
+      <div class="node" id="n-outs-econ">
+        Экономист
+      </div>
+      <div class="node" id="n-outs-hr">
+        Начальник отдела кадров
+      </div>
+      <div class="node" id="n-outs-accs">
+        Бухгалтеры (3)
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const nodes = Array.from(document.querySelectorAll('.node'));
+    const svg = document.getElementById('links-layer');
+
+    const storageKeyPos = 'orgchart-a4-positions-v1';
+    const storageKeyEdges = 'orgchart-a4-edges-v1';
+
+    let gridOn = false;
+    let arrowMode = false;
+    let arrowStartNode = null;
+
+    const edges = []; // {fromId, toId, line}
+
+    // стартовая раскладка "деревом"
+    function layoutDefault() {
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+
+      const pos = {
+        'n-gd':               {x: 0.40, y: 0.02},
+
+        'n-komdir':           {x: 0.10, y: 0.15},
+        'n-opdir':            {x: 0.10, y: 0.28},
+
+        'n-hrdir':            {x: 0.70, y: 0.15},
+        'n-logdir':           {x: 0.40, y: 0.18},
+        'n-purdir':           {x: 0.55, y: 0.15},
+        'n-sec':              {x: 0.70, y: 0.28},
+        'n-office':           {x: 0.55, y: 0.28},
+
+        // закупки
+        'n-pur-mgrs':         {x: 0.55, y: 0.36},
+
+        // продажи / клиенты / маркетинг / проекты
+        'n-dept-regsales':    {x: 0.02, y: 0.40},
+        'n-reg-mgrs':         {x: 0.02, y: 0.50},
+
+        'n-head-cust':        {x: 0.20, y: 0.40},
+        'n-cust-mgrs':        {x: 0.20, y: 0.50},
+        'n-claims':           {x: 0.20, y: 0.60},
+        'n-atlas-cust':       {x: 0.20, y: 0.70},
+        'n-shop-mgrs':        {x: 0.20, y: 0.80},
+
+        'n-lead-projects':    {x: 0.38, y: 0.40},
+
+        'n-head-mkt':         {x: 0.02, y: 0.65},
+        'n-spec-mkt':         {x: 0.02, y: 0.75},
+
+        'n-head-dig':         {x: 0.38, y: 0.52},
+        'n-dev-1c':           {x: 0.38, y: 0.62},
+        'n-admin-it':         {x: 0.38, y: 0.72},
+
+        // логистика
+        'n-head-opslog':      {x: 0.60, y: 0.40},
+        'n-log-mgr':          {x: 0.60, y: 0.50},
+        'n-log-cust':         {x: 0.60, y: 0.60},
+        'n-head-warehouse':   {x: 0.78, y: 0.40},
+        'n-receiver':         {x: 0.78, y: 0.50},
+        'n-doc-senior':       {x: 0.78, y: 0.60},
+        'n-doc-spec':         {x: 0.78, y: 0.70},
+        'n-shift-lead':       {x: 0.78, y: 0.80},
+        'n-loaders':          {x: 0.92, y: 0.40},
+        'n-forklift':         {x: 0.92, y: 0.50},
+        'n-pickers':          {x: 0.92, y: 0.60},
+        'n-controllers':      {x: 0.92, y: 0.70},
+
+        // Москва / СПб
+        'n-moscow':           {x: 0.05, y: 0.87},
+        'n-moscow-head-atlas':{x: 0.21, y: 0.87},
+        'n-moscow-sales':     {x: 0.37, y: 0.87},
+        'n-moscow-manager':   {x: 0.53, y: 0.87},
+
+        'n-moscow-dealer-head': {x: 0.05, y: 0.95},
+        'n-moscow-dealer-reg':  {x: 0.21, y: 0.95},
+
+        'n-moscow-proj-head': {x: 0.37, y: 0.95},
+        'n-moscow-proj-reg':  {x: 0.53, y: 0.95},
+
+        'n-spb':              {x: 0.69, y: 0.87},
+        'n-spb-reg':          {x: 0.85, y: 0.87},
+
+        // аутсорсинг
+        'n-outs':             {x: 0.69, y: 0.95},
+        'n-outs-dep':         {x: 0.82, y: 0.95},
+        'n-outs-chief':       {x: 0.69, y: 1.03},
+        'n-outs-econ':        {x: 0.82, y: 1.03},
+        'n-outs-hr':          {x: 0.95, y: 0.95},
+        'n-outs-accs':        {x: 0.95, y: 1.03}
+      };
+
+      nodes.forEach(node => {
+        const p = pos[node.id];
+        if (!p) return;
+        const x = p.x * w;
+        const y = p.y * h;
+        node.style.left = x + 'px';
+        node.style.top = y + 'px';
+      });
+      updateAllEdges();
+    }
+
+    function loadPositions() {
+      const saved = localStorage.getItem(storageKeyPos);
+      if (!saved) {
+        layoutDefault();
+        return;
+      }
+      try {
+        const data = JSON.parse(saved);
+        nodes.forEach(node => {
+          const pos = data[node.id];
+          if (pos) {
+            node.style.left = pos.left;
+            node.style.top = pos.top;
+          }
+        });
+      } catch(e) {
+        layoutDefault();
+        return;
+      }
+      updateAllEdges();
+    }
+
+    function savePositions() {
+      const data = {};
+      nodes.forEach(node => {
+        data[node.id] = {
+          left: node.style.left,
+          top: node.style.top
+        };
+      });
+      localStorage.setItem(storageKeyPos, JSON.stringify(data));
+    }
+
+    // ----- стрелки -----
+    function updateEdge(edge) {
+      const from = document.getElementById(edge.fromId);
+      const to = document.getElementById(edge.toId);
+      if (!from || !to) return;
+
+      const canvasRect = canvas.getBoundingClientRect();
+      const r1 = from.getBoundingClientRect();
+      const r2 = to.getBoundingClientRect();
+
+      const x1 = r1.left + r1.width / 2 - canvasRect.left;
+      const y1 = r1.top + r1.height / 2 - canvasRect.top;
+      const x2 = r2.left + r2.width / 2 - canvasRect.left;
+      const y2 = r2.top + r2.height / 2 - canvasRect.top;
+
+      edge.line.setAttribute('x1', x1);
+      edge.line.setAttribute('y1', y1);
+      edge.line.setAttribute('x2', x2);
+      edge.line.setAttribute('y2', y2);
+    }
+
+    function updateAllEdges() {
+      edges.forEach(updateEdge);
+    }
+
+    function saveEdges() {
+      const data = edges.map(e => ({fromId: e.fromId, toId: e.toId}));
+      localStorage.setItem(storageKeyEdges, JSON.stringify(data));
+    }
+
+    function createEdge(fromId, toId) {
+      if (fromId === toId) return;
+      // не дублируем
+      if (edges.some(e => e.fromId === fromId && e.toId === toId)) return;
+
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('stroke', '#000');
+      line.setAttribute('stroke-width', '1');
+      line.setAttribute('marker-end', 'url(#arrow)');
+      svg.appendChild(line);
+
+      const edge = {fromId, toId, line};
+      edges.push(edge);
+      updateEdge(edge);
+      saveEdges();
+    }
+
+    function loadEdges() {
+      const saved = localStorage.getItem(storageKeyEdges);
+      if (!saved) return;
+      try {
+        const data = JSON.parse(saved);
+        data.forEach(e => createEdge(e.fromId, e.toId));
+      } catch(e) {
+        // игнор
+      }
+    }
+
+    function clearEdges() {
+      edges.splice(0, edges.length);
+      while (svg.lastChild && svg.lastChild.nodeName === 'line') {
+        svg.removeChild(svg.lastChild);
+      }
+      // безопасно: просто очищаем всё, кроме <defs>
+      Array.from(svg.querySelectorAll('line')).forEach(l => l.remove());
+      localStorage.removeItem(storageKeyEdges);
+    }
+
+    // ----- перетаскивание -----
+    let active = null;
+    let shiftX = 0;
+    let shiftY = 0;
+
+    nodes.forEach(node => {
+      node.addEventListener('pointerdown', (e) => {
+        if (arrowMode) return; // в режиме стрелок не таскаем
+        active = node;
+        active.setPointerCapture(e.pointerId);
+        const rect = active.getBoundingClientRect();
+        const canvasRect = canvas.getBoundingClientRect();
+        shiftX = e.clientX - rect.left;
+        shiftY = e.clientY - rect.top;
+        active.style.zIndex = Date.now().toString();
+      });
+
+      node.addEventListener('pointerup', (e) => {
+        if (active) {
+          active.releasePointerCapture(e.pointerId);
+          active = null;
+          savePositions();
+          updateAllEdges();
+        }
+      });
+
+      // клик для стрелок
+      node.addEventListener('click', (e) => {
+        if (!arrowMode) return;
+        e.stopPropagation();
+
+        if (!arrowStartNode) {
+          arrowStartNode = node;
+          node.classList.add('selected');
+        } else {
+          if (node !== arrowStartNode) {
+            createEdge(arrowStartNode.id, node.id);
+          }
+          arrowStartNode.classList.remove('selected');
+          arrowStartNode = null;
+        }
+      });
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+      if (!active) return;
+      const canvasRect = canvas.getBoundingClientRect();
+      let x = e.clientX - canvasRect.left - shiftX;
+      let y = e.clientY - canvasRect.top - shiftY;
+
+      x = Math.max(0, Math.min(x, canvas.clientWidth - active.offsetWidth));
+      y = Math.max(0, Math.min(y, canvas.clientHeight - active.offsetHeight));
+
+      active.style.left = x + 'px';
+      active.style.top = y + 'px';
+
+      updateAllEdges();
+    });
+
+    // ----- кнопки -----
+    document.getElementById('reset').addEventListener('click', () => {
+      localStorage.removeItem(storageKeyPos);
+      layoutDefault();
+    });
+
+    document.getElementById('toggle-grid').addEventListener('click', (e) => {
+      gridOn = !gridOn;
+      canvas.classList.toggle('grid-on', gridOn);
+      e.target.textContent = 'Сетка: ' + (gridOn ? 'вкл' : 'выкл');
+    });
+
+    document.getElementById('toggle-arrows').addEventListener('click', (e) => {
+      arrowMode = !arrowMode;
+      if (!arrowMode && arrowStartNode) {
+        arrowStartNode.classList.remove('selected');
+        arrowStartNode = null;
+      }
+      e.target.textContent = 'Режим стрелок: ' + (arrowMode ? 'вкл' : 'выкл');
+    });
+
+    document.getElementById('clear-arrows').addEventListener('click', () => {
+      clearEdges();
+    });
+
+    // обновляем стрелки при ресайзе окна
+    window.addEventListener('resize', updateAllEdges);
+
+    // старт
+    window.addEventListener('load', () => {
+      loadPositions();
+      loadEdges();
+    });
+  </script>
+</body>
+</html>
