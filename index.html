@@ -82,19 +82,18 @@
       margin-top: 1px;
     }
 
-    .node.selected {
-      border-width: 2px;
-    }
-
     #links-layer {
       position: absolute;
       inset: 0;
       width: 100%;
       height: 100%;
+      pointer-events: none;
     }
 
-    /* чтобы по линиям можно было кликать */
     #links-layer path {
+      stroke: #000;
+      stroke-width: 1;
+      fill: none;
       pointer-events: stroke;
     }
   </style>
@@ -102,11 +101,9 @@
 <body>
   <div class="page">
     <div class="toolbar">
-      Перетаскивайте блоки мышкой.
+      Перетаскивайте блоки мышкой. Связи рисуются автоматически.
       <button id="toggle-grid">Сетка: выкл</button>
-      <button id="toggle-arrows">Режим стрелок: выкл</button>
-      <button id="toggle-delete-arrows">Удалять стрелки: выкл</button>
-      <button id="clear-arrows">Очистить все стрелки</button>
+      <button id="toggle-links">Связи: вкл</button>
       <button id="reset">Сбросить расположение</button>
     </div>
 
@@ -303,14 +300,114 @@
     const svg = document.getElementById('links-layer');
 
     const storageKeyPos = 'orgchart-a4-positions-v1';
-    const storageKeyEdges = 'orgchart-a4-edges-v1';
 
     let gridOn = false;
-    let arrowMode = false;
-    let deleteArrowMode = false;
-    let arrowStartNode = null;
+    let linksOn = true;
 
-    const edges = []; // {fromId, toId, path}
+    // карта подчинённости: кто кому подчиняется
+    const parentMap = {
+      'n-komdir': 'n-gd',
+      'n-opdir': 'n-komdir',
+      'n-hrdir': 'n-gd',
+      'n-logdir': 'n-gd',
+      'n-purdir': 'n-gd',
+      'n-sec': 'n-gd',
+      'n-office': 'n-gd',
+
+      'n-pur-mgrs': 'n-purdir',
+
+      'n-dept-regsales': 'n-opdir',
+      'n-reg-mgrs': 'n-dept-regsales',
+
+      'n-head-cust': 'n-opdir',
+      'n-cust-mgrs': 'n-head-cust',
+      'n-claims': 'n-head-cust',
+      'n-atlas-cust': 'n-head-cust',
+      'n-shop-mgrs': 'n-head-cust',
+
+      'n-lead-projects': 'n-opdir',
+
+      'n-head-mkt': 'n-opdir',
+      'n-spec-mkt': 'n-head-mkt',
+
+      'n-head-dig': 'n-opdir',
+      'n-dev-1c': 'n-head-dig',
+      'n-admin-it': 'n-head-dig',
+
+      'n-head-opslog': 'n-logdir',
+      'n-log-mgr': 'n-head-opslog',
+      'n-log-cust': 'n-head-opslog',
+      'n-head-warehouse': 'n-head-opslog',
+      'n-receiver': 'n-head-warehouse',
+      'n-doc-senior': 'n-head-opslog',
+      'n-doc-spec': 'n-doc-senior',
+      'n-shift-lead': 'n-head-warehouse',
+      'n-loaders': 'n-shift-lead',
+      'n-forklift': 'n-shift-lead',
+      'n-pickers': 'n-shift-lead',
+      'n-controllers': 'n-shift-lead',
+
+      'n-moscow': 'n-opdir',
+      'n-moscow-head-atlas': 'n-moscow',
+      'n-moscow-sales': 'n-moscow-head-atlas',
+      'n-moscow-manager': 'n-moscow-head-atlas',
+
+      'n-moscow-dealer-head': 'n-opdir',
+      'n-moscow-dealer-reg': 'n-moscow-dealer-head',
+
+      'n-moscow-proj-head': 'n-opdir',
+      'n-moscow-proj-reg': 'n-moscow-proj-head',
+
+      'n-spb': 'n-opdir',
+      'n-spb-reg': 'n-spb',
+
+      'n-outs': 'n-gd',
+      'n-outs-dep': 'n-outs',
+      'n-outs-chief': 'n-outs-dep',
+      'n-outs-econ': 'n-outs-chief',
+      'n-outs-hr': 'n-outs-dep',
+      'n-outs-accs': 'n-outs-chief'
+    };
+
+    // храним path для каждого childId
+    const linkPaths = {};
+
+    function createPaths() {
+      Object.keys(parentMap).forEach(childId => {
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        svg.appendChild(path);
+        linkPaths[childId] = path;
+      });
+    }
+
+    function updateLinks() {
+      if (!linksOn) {
+        Object.values(linkPaths).forEach(p => p.setAttribute('d', ''));
+        return;
+      }
+
+      const canvasRect = canvas.getBoundingClientRect();
+
+      Object.entries(parentMap).forEach(([childId, parentId]) => {
+        const parent = document.getElementById(parentId);
+        const child = document.getElementById(childId);
+        const path = linkPaths[childId];
+        if (!parent || !child || !path) return;
+
+        const r1 = parent.getBoundingClientRect();
+        const r2 = child.getBoundingClientRect();
+
+        const x1 = r1.left + r1.width / 2 - canvasRect.left;
+        const y1 = r1.bottom - canvasRect.top;
+        const x2 = r2.left + r2.width / 2 - canvasRect.left;
+        const y2 = r2.top - canvasRect.top;
+
+        const midY = (y1 + y2) / 2;
+
+        const d = `M ${x1} ${y1} L ${x1} ${midY} L ${x2} ${midY} L ${x2} ${y2}`;
+        path.setAttribute('d', d);
+      });
+    }
 
     function layoutDefault() {
       const w = canvas.clientWidth;
@@ -391,7 +488,7 @@
         node.style.left = x + 'px';
         node.style.top = y + 'px';
       });
-      updateAllEdges();
+      updateLinks();
     }
 
     function loadPositions() {
@@ -413,7 +510,7 @@
         layoutDefault();
         return;
       }
-      updateAllEdges();
+      updateLinks();
     }
 
     function savePositions() {
@@ -427,86 +524,13 @@
       localStorage.setItem(storageKeyPos, JSON.stringify(data));
     }
 
-    // ---- стрелки «скобочкой» ----
-    function updateEdge(edge) {
-      const from = document.getElementById(edge.fromId);
-      const to = document.getElementById(edge.toId);
-      if (!from || !to) return;
-
-      const canvasRect = canvas.getBoundingClientRect();
-      const r1 = from.getBoundingClientRect();
-      const r2 = to.getBoundingClientRect();
-
-      // из низа начальника в верх подчинённого
-      const x1 = r1.left + r1.width / 2 - canvasRect.left;
-      const y1 = r1.bottom - canvasRect.top;
-      const x2 = r2.left + r2.width / 2 - canvasRect.left;
-      const y2 = r2.top - canvasRect.top;
-
-      const midY = (y1 + y2) / 2;
-
-      const d = `M ${x1} ${y1} L ${x1} ${midY} L ${x2} ${midY} L ${x2} ${y2}`;
-      edge.path.setAttribute('d', d);
-    }
-
-    function updateAllEdges() {
-      edges.forEach(updateEdge);
-    }
-
-    function saveEdges() {
-      const data = edges.map(e => ({fromId: e.fromId, toId: e.toId}));
-      localStorage.setItem(storageKeyEdges, JSON.stringify(data));
-    }
-
-    function createEdge(fromId, toId) {
-      if (fromId === toId) return;
-      if (edges.some(e => e.fromId === fromId && e.toId === toId)) return;
-
-      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      path.setAttribute('stroke', '#000');
-      path.setAttribute('stroke-width', '1');
-      path.setAttribute('fill', 'none');
-      svg.appendChild(path);
-
-      const edge = {fromId, toId, path};
-
-      path.addEventListener('click', (e) => {
-        if (!deleteArrowMode) return;
-        e.stopPropagation();
-        const idx = edges.indexOf(edge);
-        if (idx !== -1) edges.splice(idx, 1);
-        path.remove();
-        saveEdges();
-      });
-
-      edges.push(edge);
-      updateEdge(edge);
-      saveEdges();
-    }
-
-    function loadEdges() {
-      const saved = localStorage.getItem(storageKeyEdges);
-      if (!saved) return;
-      try {
-        const data = JSON.parse(saved);
-        data.forEach(e => createEdge(e.fromId, e.toId));
-      } catch(e) {}
-    }
-
-    function clearEdges() {
-      edges.splice(0, edges.length);
-      Array.from(svg.querySelectorAll('path')).forEach(p => p.remove());
-      localStorage.removeItem(storageKeyEdges);
-    }
-
-    // ----- перетаскивание -----
+    // перетаскивание
     let active = null;
     let shiftX = 0;
     let shiftY = 0;
 
     nodes.forEach(node => {
       node.addEventListener('pointerdown', (e) => {
-        if (arrowMode || deleteArrowMode) return;
         active = node;
         active.setPointerCapture(e.pointerId);
         const rect = active.getBoundingClientRect();
@@ -521,23 +545,7 @@
           active.releasePointerCapture(e.pointerId);
           active = null;
           savePositions();
-          updateAllEdges();
-        }
-      });
-
-      node.addEventListener('click', (e) => {
-        if (!arrowMode) return;
-        e.stopPropagation();
-
-        if (!arrowStartNode) {
-          arrowStartNode = node;
-          node.classList.add('selected');
-        } else {
-          if (node !== arrowStartNode) {
-            createEdge(arrowStartNode.id, node.id);
-          }
-          arrowStartNode.classList.remove('selected');
-          arrowStartNode = null;
+          updateLinks();
         }
       });
     });
@@ -554,10 +562,10 @@
       active.style.left = x + 'px';
       active.style.top = y + 'px';
 
-      updateAllEdges();
+      updateLinks();
     });
 
-    // ----- кнопки -----
+    // кнопки
     document.getElementById('reset').addEventListener('click', () => {
       localStorage.removeItem(storageKeyPos);
       layoutDefault();
@@ -569,41 +577,17 @@
       e.target.textContent = 'Сетка: ' + (gridOn ? 'вкл' : 'выкл');
     });
 
-    document.getElementById('toggle-arrows').addEventListener('click', (e) => {
-      arrowMode = !arrowMode;
-      if (arrowMode) {
-        deleteArrowMode = false;
-        document.getElementById('toggle-delete-arrows').textContent = 'Удалять стрелки: выкл';
-      }
-      if (!arrowMode && arrowStartNode) {
-        arrowStartNode.classList.remove('selected');
-        arrowStartNode = null;
-      }
-      e.target.textContent = 'Режим стрелок: ' + (arrowMode ? 'вкл' : 'выкл');
+    document.getElementById('toggle-links').addEventListener('click', (e) => {
+      linksOn = !linksOn;
+      e.target.textContent = 'Связи: ' + (linksOn ? 'вкл' : 'выкл');
+      updateLinks();
     });
 
-    document.getElementById('toggle-delete-arrows').addEventListener('click', (e) => {
-      deleteArrowMode = !deleteArrowMode;
-      if (deleteArrowMode) {
-        arrowMode = false;
-        document.getElementById('toggle-arrows').textContent = 'Режим стрелок: выкл';
-        if (arrowStartNode) {
-          arrowStartNode.classList.remove('selected');
-          arrowStartNode = null;
-        }
-      }
-      e.target.textContent = 'Удалять стрелки: ' + (deleteArrowMode ? 'вкл' : 'выкл');
-    });
-
-    document.getElementById('clear-arrows').addEventListener('click', () => {
-      clearEdges();
-    });
-
-    window.addEventListener('resize', updateAllEdges);
+    window.addEventListener('resize', updateLinks);
 
     window.addEventListener('load', () => {
+      createPaths();
       loadPositions();
-      loadEdges();
     });
   </script>
 </body>
