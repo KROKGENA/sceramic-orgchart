@@ -294,305 +294,308 @@
     </div>
   </div>
 
-  <script>
-    const canvas = document.getElementById('canvas');
-    const nodes = Array.from(document.querySelectorAll('.node'));
-    const svg = document.getElementById('links-layer');
+<script>
+  const canvas = document.getElementById('canvas');
+  const nodes = Array.from(document.querySelectorAll('.node'));
+  const svg = document.getElementById('links-layer');
 
-    const storageKeyPos = 'orgchart-a4-positions-v1';
-    const storageKeyLines = 'orgchart-a4-lines-v1';
+  const storageKeyPos = 'orgchart-a4-positions-v1';
+  const storageKeyLines = 'orgchart-a4-lines-v1';
 
-    let gridOn = false;
-    let drawMode = false;
-    let deleteMode = false;
+  let gridOn = false;
+  let drawMode = false;
+  let deleteMode = false;
 
-    // -------- ЛИНИИ (ручное рисование) --------
-    let drawing = false;
-    let startX = 0;
-    let startY = 0;
-    let tempLine = null;
-    const lines = []; // {x1,y1,x2,y2, element}
+  // -------- ЛИНИИ (ручное рисование) --------
+  let drawing = false;
+  let startX = 0;
+  let startY = 0;
+  let tempLine = null;
+  const lines = []; // {x1,y1,x2,y2, element}
 
-    function saveLines() {
-      const data = lines.map(l => ({x1: l.x1, y1: l.y1, x2: l.x2, y2: l.y2}));
-      localStorage.setItem(storageKeyLines, JSON.stringify(data));
-    }
+  function saveLines() {
+    const data = lines.map(l => ({x1: l.x1, y1: l.y1, x2: l.x2, y2: l.y2}));
+    localStorage.setItem(storageKeyLines, JSON.stringify(data));
+  }
 
-    function loadLines() {
-      const saved = localStorage.getItem(storageKeyLines);
-      if (!saved) return;
-      try {
-        const data = JSON.parse(saved);
-        data.forEach(d => {
-          const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-          line.setAttribute('x1', d.x1);
-          line.setAttribute('y1', d.y1);
-          line.setAttribute('x2', d.x2);
-          line.setAttribute('y2', d.y2);
-          svg.appendChild(line);
-          const obj = {x1: d.x1, y1: d.y1, x2: d.x2, y2: d.y2, element: line};
-          lines.push(obj);
+  function loadLines() {
+    const saved = localStorage.getItem(storageKeyLines);
+    if (!saved) return;
+    try {
+      const data = JSON.parse(saved);
+      data.forEach(d => {
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', d.x1);
+        line.setAttribute('y1', d.y1);
+        line.setAttribute('x2', d.x2);
+        line.setAttribute('y2', d.y2);
+        svg.appendChild(line);
+        const obj = {x1: d.x1, y1: d.y1, x2: d.x2, y2: d.y2, element: line};
+        lines.push(obj);
 
-          line.addEventListener('click', (e) => {
-            if (!deleteMode) return;
-            e.stopPropagation();
-            const idx = lines.indexOf(obj);
-            if (idx !== -1) lines.splice(idx, 1);
-            line.remove();
-            saveLines();
-          });
+        line.addEventListener('click', (e) => {
+          if (!deleteMode) return;
+          e.stopPropagation();
+          const idx = lines.indexOf(obj);
+          if (idx !== -1) lines.splice(idx, 1);
+          line.remove();
+          saveLines();
         });
-      } catch(e) {}
-    }
-
-    function clearLines() {
-      lines.splice(0, lines.length);
-      Array.from(svg.querySelectorAll('line')).forEach(l => l.remove());
-      localStorage.removeItem(storageKeyLines);
-    }
-
-    canvas.addEventListener('pointerdown', (e) => {
-      if (!drawMode) return;
-      const rect = canvas.getBoundingClientRect();
-      drawing = true;
-      startX = e.clientX - rect.left;
-      startY = e.clientY - rect.top;
-
-      tempLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      tempLine.setAttribute('x1', startX);
-      tempLine.setAttribute('y1', startY);
-      tempLine.setAttribute('x2', startX);
-      tempLine.setAttribute('y2', startY);
-      svg.appendChild(tempLine);
-    });
-
-    canvas.addEventListener('pointermove', (e) => {
-      if (!drawing || !tempLine) return;
-      const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      tempLine.setAttribute('x2', x);
-      tempLine.setAttribute('y2', y);
-    });
-
-    canvas.addEventListener('pointerup', (e) => {
-      if (!drawing || !tempLine) return;
-      const rect = canvas.getBoundingClientRect();
-      const x2 = e.clientX - rect.left;
-      const y2 = e.clientY - rect.top;
-
-      tempLine.setAttribute('x2', x2);
-      tempLine.setAttribute('y2', y2);
-
-      const obj = {x1: startX, y1: startY, x2, y2, element: tempLine};
-      lines.push(obj);
-
-      tempLine.addEventListener('click', (ev) => {
-        if (!deleteMode) return;
-        ev.stopPropagation();
-        const idx = lines.indexOf(obj);
-        if (idx !== -1) lines.splice(idx, 1);
-        tempLine.remove();
-        saveLines();
       });
+    } catch(e) {}
+  }
 
+  function clearLines() {
+    lines.splice(0, lines.length);
+    Array.from(svg.querySelectorAll('line')).forEach(l => l.remove());
+    localStorage.removeItem(storageKeyLines);
+  }
+
+  canvas.addEventListener('pointerdown', (e) => {
+    if (!drawMode) return;
+    const rect = canvas.getBoundingClientRect();
+    drawing = true;
+    startX = e.clientX - rect.left;
+    startY = e.clientY - rect.top;
+
+    tempLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    tempLine.setAttribute('x1', startX);
+    tempLine.setAttribute('y1', startY);
+    tempLine.setAttribute('x2', startX);
+    tempLine.setAttribute('y2', startY);
+    svg.appendChild(tempLine);
+  });
+
+  canvas.addEventListener('pointermove', (e) => {
+    if (!drawing || !tempLine) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    tempLine.setAttribute('x2', x);
+    tempLine.setAttribute('y2', y);
+  });
+
+  canvas.addEventListener('pointerup', (e) => {
+    if (!drawing || !tempLine) return;
+    const rect = canvas.getBoundingClientRect();
+    const x2 = e.clientX - rect.left;
+    const y2 = e.clientY - rect.top;
+
+    tempLine.setAttribute('x2', x2);
+    tempLine.setAttribute('y2', y2);
+
+    // фикс: сохраняем ссылку на линию в отдельную переменную
+    const line = tempLine;
+    const obj = {x1: startX, y1: startY, x2, y2, element: line};
+    lines.push(obj);
+
+    line.addEventListener('click', (ev) => {
+      if (!deleteMode) return;
+      ev.stopPropagation();
+      const idx = lines.indexOf(obj);
+      if (idx !== -1) lines.splice(idx, 1);
+      line.remove();
       saveLines();
-      drawing = false;
-      tempLine = null;
     });
 
-    // -------- ПЕРЕТАСКИВАНИЕ БЛОКОВ --------
-    let active = null;
-    let shiftX = 0;
-    let shiftY = 0;
+    saveLines();
+    drawing = false;
+    tempLine = null;
+  });
+
+  // -------- ПЕРЕТАСКИВАНИЕ БЛОКОВ --------
+  let active = null;
+  let shiftX = 0;
+  let shiftY = 0;
+
+  nodes.forEach(node => {
+    node.addEventListener('pointerdown', (e) => {
+      if (drawMode || deleteMode) return; // в режимах линий не таскаем
+      active = node;
+      active.setPointerCapture(e.pointerId);
+      const rect = active.getBoundingClientRect();
+      const canvasRect = canvas.getBoundingClientRect();
+      shiftX = e.clientX - rect.left;
+      shiftY = e.clientY - rect.top;
+      active.style.zIndex = Date.now().toString();
+    });
+
+    node.addEventListener('pointerup', (e) => {
+      if (active) {
+        active.releasePointerCapture(e.pointerId);
+        active = null;
+        savePositions();
+      }
+    });
+  });
+
+  canvas.addEventListener('pointermove', (e) => {
+    if (!active) return;
+    const canvasRect = canvas.getBoundingClientRect();
+    let x = e.clientX - canvasRect.left - shiftX;
+    let y = e.clientY - canvasRect.top - shiftY;
+
+    x = Math.max(0, Math.min(x, canvas.clientWidth - active.offsetWidth));
+    y = Math.max(0, Math.min(y, canvas.clientHeight - active.offsetHeight));
+
+    active.style.left = x + 'px';
+    active.style.top = y + 'px';
+  });
+
+  // -------- ПОЗИЦИИ БЛОКОВ --------
+  function layoutDefault() {
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+
+    const pos = {
+      'n-gd':               {x: 0.40, y: 0.02},
+
+      'n-komdir':           {x: 0.10, y: 0.15},
+      'n-opdir':            {x: 0.10, y: 0.28},
+
+      'n-hrdir':            {x: 0.70, y: 0.15},
+      'n-logdir':           {x: 0.40, y: 0.18},
+      'n-purdir':           {x: 0.55, y: 0.15},
+      'n-sec':              {x: 0.70, y: 0.28},
+      'n-office':           {x: 0.55, y: 0.28},
+
+      'n-pur-mgrs':         {x: 0.55, y: 0.36},
+
+      'n-dept-regsales':    {x: 0.02, y: 0.40},
+      'n-reg-mgrs':         {x: 0.02, y: 0.50},
+
+      'n-head-cust':        {x: 0.20, y: 0.40},
+      'n-cust-mgrs':        {x: 0.20, y: 0.50},
+      'n-claims':           {x: 0.20, y: 0.60},
+      'n-atlas-cust':       {x: 0.20, y: 0.70},
+      'n-shop-mgrs':        {x: 0.20, y: 0.80},
+
+      'n-lead-projects':    {x: 0.38, y: 0.40},
+
+      'n-head-mkt':         {x: 0.02, y: 0.65},
+      'n-spec-mkt':         {x: 0.02, y: 0.75},
+
+      'n-head-dig':         {x: 0.38, y: 0.52},
+      'n-dev-1c':           {x: 0.38, y: 0.62},
+      'n-admin-it':         {x: 0.38, y: 0.72},
+
+      'n-head-opslog':      {x: 0.60, y: 0.40},
+      'n-log-mgr':          {x: 0.60, y: 0.50},
+      'n-log-cust':         {x: 0.60, y: 0.60},
+      'n-head-warehouse':   {x: 0.78, y: 0.40},
+      'n-receiver':         {x: 0.78, y: 0.50},
+      'n-doc-senior':       {x: 0.78, y: 0.60},
+      'n-doc-spec':         {x: 0.78, y: 0.70},
+      'n-shift-lead':       {x: 0.78, y: 0.80},
+      'n-loaders':          {x: 0.92, y: 0.40},
+      'n-forklift':         {x: 0.92, y: 0.50},
+      'n-pickers':          {x: 0.92, y: 0.60},
+      'n-controllers':      {x: 0.92, y: 0.70},
+
+      'n-moscow':           {x: 0.05, y: 0.87},
+      'n-moscow-head-atlas':{x: 0.21, y: 0.87},
+      'n-moscow-sales':     {x: 0.37, y: 0.87},
+      'n-moscow-manager':   {x: 0.53, y: 0.87},
+
+      'n-moscow-dealer-head': {x: 0.05, y: 0.95},
+      'n-moscow-dealer-reg':  {x: 0.21, y: 0.95},
+
+      'n-moscow-proj-head': {x: 0.37, y: 0.95},
+      'n-moscow-proj-reg':  {x: 0.53, y: 0.95},
+
+      'n-spb':              {x: 0.69, y: 0.87},
+      'n-spb-reg':          {x: 0.85, y: 0.87},
+
+      'n-outs':             {x: 0.69, y: 0.95},
+      'n-outs-dep':         {x: 0.82, y: 0.95},
+      'n-outs-chief':       {x: 0.69, y: 1.03},
+      'n-outs-econ':        {x: 0.82, y: 1.03},
+      'n-outs-hr':          {x: 0.95, y: 0.95},
+      'n-outs-accs':        {x: 0.95, y: 1.03}
+    };
 
     nodes.forEach(node => {
-      node.addEventListener('pointerdown', (e) => {
-        if (drawMode || deleteMode) return; // в режимах линий не таскаем
-        active = node;
-        active.setPointerCapture(e.pointerId);
-        const rect = active.getBoundingClientRect();
-        const canvasRect = canvas.getBoundingClientRect();
-        shiftX = e.clientX - rect.left;
-        shiftY = e.clientY - rect.top;
-        active.style.zIndex = Date.now().toString();
-      });
+      const p = pos[node.id];
+      if (!p) return;
+      const x = p.x * w;
+      const y = p.y * h;
+      node.style.left = x + 'px';
+      node.style.top = y + 'px';
+    });
+  }
 
-      node.addEventListener('pointerup', (e) => {
-        if (active) {
-          active.releasePointerCapture(e.pointerId);
-          active = null;
-          savePositions();
+  function loadPositions() {
+    const saved = localStorage.getItem(storageKeyPos);
+    if (!saved) {
+      layoutDefault();
+      return;
+    }
+    try {
+      const data = JSON.parse(saved);
+      nodes.forEach(node => {
+        const pos = data[node.id];
+        if (pos) {
+          node.style.left = pos.left;
+          node.style.top = pos.top;
         }
       });
-    });
+    } catch(e) {
+      layoutDefault();
+    }
+  }
 
-    canvas.addEventListener('pointermove', (e) => {
-      if (!active) return;
-      const canvasRect = canvas.getBoundingClientRect();
-      let x = e.clientX - canvasRect.left - shiftX;
-      let y = e.clientY - canvasRect.top - shiftY;
-
-      x = Math.max(0, Math.min(x, canvas.clientWidth - active.offsetWidth));
-      y = Math.max(0, Math.min(y, canvas.clientHeight - active.offsetHeight));
-
-      active.style.left = x + 'px';
-      active.style.top = y + 'px';
-    });
-
-    // -------- ПОЗИЦИИ БЛОКОВ --------
-    function layoutDefault() {
-      const w = canvas.clientWidth;
-      const h = canvas.clientHeight;
-
-      const pos = {
-        'n-gd':               {x: 0.40, y: 0.02},
-
-        'n-komdir':           {x: 0.10, y: 0.15},
-        'n-opdir':            {x: 0.10, y: 0.28},
-
-        'n-hrdir':            {x: 0.70, y: 0.15},
-        'n-logdir':           {x: 0.40, y: 0.18},
-        'n-purdir':           {x: 0.55, y: 0.15},
-        'n-sec':              {x: 0.70, y: 0.28},
-        'n-office':           {x: 0.55, y: 0.28},
-
-        'n-pur-mgrs':         {x: 0.55, y: 0.36},
-
-        'n-dept-regsales':    {x: 0.02, y: 0.40},
-        'n-reg-mgrs':         {x: 0.02, y: 0.50},
-
-        'n-head-cust':        {x: 0.20, y: 0.40},
-        'n-cust-mgrs':        {x: 0.20, y: 0.50},
-        'n-claims':           {x: 0.20, y: 0.60},
-        'n-atlas-cust':       {x: 0.20, y: 0.70},
-        'n-shop-mgrs':        {x: 0.20, y: 0.80},
-
-        'n-lead-projects':    {x: 0.38, y: 0.40},
-
-        'n-head-mkt':         {x: 0.02, y: 0.65},
-        'n-spec-mkt':         {x: 0.02, y: 0.75},
-
-        'n-head-dig':         {x: 0.38, y: 0.52},
-        'n-dev-1c':           {x: 0.38, y: 0.62},
-        'n-admin-it':         {x: 0.38, y: 0.72},
-
-        'n-head-opslog':      {x: 0.60, y: 0.40},
-        'n-log-mgr':          {x: 0.60, y: 0.50},
-        'n-log-cust':         {x: 0.60, y: 0.60},
-        'n-head-warehouse':   {x: 0.78, y: 0.40},
-        'n-receiver':         {x: 0.78, y: 0.50},
-        'n-doc-senior':       {x: 0.78, y: 0.60},
-        'n-doc-spec':         {x: 0.78, y: 0.70},
-        'n-shift-lead':       {x: 0.78, y: 0.80},
-        'n-loaders':          {x: 0.92, y: 0.40},
-        'n-forklift':         {x: 0.92, y: 0.50},
-        'n-pickers':          {x: 0.92, y: 0.60},
-        'n-controllers':      {x: 0.92, y: 0.70},
-
-        'n-moscow':           {x: 0.05, y: 0.87},
-        'n-moscow-head-atlas':{x: 0.21, y: 0.87},
-        'n-moscow-sales':     {x: 0.37, y: 0.87},
-        'n-moscow-manager':   {x: 0.53, y: 0.87},
-
-        'n-moscow-dealer-head': {x: 0.05, y: 0.95},
-        'n-moscow-dealer-reg':  {x: 0.21, y: 0.95},
-
-        'n-moscow-proj-head': {x: 0.37, y: 0.95},
-        'n-moscow-proj-reg':  {x: 0.53, y: 0.95},
-
-        'n-spb':              {x: 0.69, y: 0.87},
-        'n-spb-reg':          {x: 0.85, y: 0.87},
-
-        'n-outs':             {x: 0.69, y: 0.95},
-        'n-outs-dep':         {x: 0.82, y: 0.95},
-        'n-outs-chief':       {x: 0.69, y: 1.03},
-        'n-outs-econ':        {x: 0.82, y: 1.03},
-        'n-outs-hr':          {x: 0.95, y: 0.95},
-        'n-outs-accs':        {x: 0.95, y: 1.03}
+  function savePositions() {
+    const data = {};
+    nodes.forEach(node => {
+      data[node.id] = {
+        left: node.style.left,
+        top: node.style.top
       };
+    });
+    localStorage.setItem(storageKeyPos, JSON.stringify(data));
+  }
 
-      nodes.forEach(node => {
-        const p = pos[node.id];
-        if (!p) return;
-        const x = p.x * w;
-        const y = p.y * h;
-        node.style.left = x + 'px';
-        node.style.top = y + 'px';
-      });
+  // -------- КНОПКИ --------
+  document.getElementById('reset').addEventListener('click', () => {
+    localStorage.removeItem(storageKeyPos);
+    layoutDefault();
+  });
+
+  document.getElementById('toggle-grid').addEventListener('click', (e) => {
+    gridOn = !gridOn;
+    canvas.classList.toggle('grid-on', gridOn);
+    e.target.textContent = 'Сетка: ' + (gridOn ? 'вкл' : 'выкл');
+  });
+
+  document.getElementById('draw-mode').addEventListener('click', (e) => {
+    drawMode = !drawMode;
+    if (drawMode) {
+      deleteMode = false;
+      document.getElementById('delete-mode').textContent = 'Удалять линии: выкл';
     }
+    e.target.textContent = 'Рисовать линии: ' + (drawMode ? 'вкл' : 'выкл');
+  });
 
-    function loadPositions() {
-      const saved = localStorage.getItem(storageKeyPos);
-      if (!saved) {
-        layoutDefault();
-        return;
-      }
-      try {
-        const data = JSON.parse(saved);
-        nodes.forEach(node => {
-          const pos = data[node.id];
-          if (pos) {
-            node.style.left = pos.left;
-            node.style.top = pos.top;
-          }
-        });
-      } catch(e) {
-        layoutDefault();
-      }
+  document.getElementById('delete-mode').addEventListener('click', (e) => {
+    deleteMode = !deleteMode;
+    if (deleteMode) {
+      drawMode = false;
+      document.getElementById('draw-mode').textContent = 'Рисовать линии: выкл';
     }
+    e.target.textContent = 'Удалять линии: ' + (deleteMode ? 'вкл' : 'выкл');
+  });
 
-    function savePositions() {
-      const data = {};
-      nodes.forEach(node => {
-        data[node.id] = {
-          left: node.style.left,
-          top: node.style.top
-        };
-      });
-      localStorage.setItem(storageKeyPos, JSON.stringify(data));
-    }
+  document.getElementById('clear-lines').addEventListener('click', () => {
+    clearLines();
+  });
 
-    // -------- КНОПКИ --------
-    document.getElementById('reset').addEventListener('click', () => {
-      localStorage.removeItem(storageKeyPos);
-      layoutDefault();
-    });
+  // старт
+  window.addEventListener('load', () => {
+    layoutDefault();
+    loadPositions();
+    loadLines();
+  });
+</script>
 
-    document.getElementById('toggle-grid').addEventListener('click', (e) => {
-      gridOn = !gridOn;
-      canvas.classList.toggle('grid-on', gridOn);
-      e.target.textContent = 'Сетка: ' + (gridOn ? 'вкл' : 'выкл');
-    });
-
-    document.getElementById('draw-mode').addEventListener('click', (e) => {
-      drawMode = !drawMode;
-      if (drawMode) {
-        deleteMode = false;
-        document.getElementById('delete-mode').textContent = 'Удалять линии: выкл';
-      }
-      e.target.textContent = 'Рисовать линии: ' + (drawMode ? 'вкл' : 'выкл');
-    });
-
-    document.getElementById('delete-mode').addEventListener('click', (e) => {
-      deleteMode = !deleteMode;
-      if (deleteMode) {
-        drawMode = false;
-        document.getElementById('draw-mode').textContent = 'Рисовать линии: выкл';
-      }
-      e.target.textContent = 'Удалять линии: ' + (deleteMode ? 'вкл' : 'выкл');
-    });
-
-    document.getElementById('clear-lines').addEventListener('click', () => {
-      clearLines();
-    });
-
-    // старт
-    window.addEventListener('load', () => {
-      layoutDefault();
-      loadPositions();
-      loadLines();
-    });
-  </script>
 </body>
 </html>
