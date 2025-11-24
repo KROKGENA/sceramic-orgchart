@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <title>Оргструктура компании</title>
   <style>
-    /* Параметры печати под А4, книжная, поля */
     @page {
       size: A4 portrait;
       margin: 15mm;
@@ -48,7 +47,6 @@
       overflow: hidden;
     }
 
-    /* Сетка (вкл/выкл по классу grid-on) */
     .canvas.grid-on {
       background-image:
         linear-gradient(to right, #e0e0e0 1px, transparent 1px),
@@ -88,7 +86,6 @@
       border-width: 2px;
     }
 
-    /* Слой для стрелок */
     #links-layer {
       position: absolute;
       inset: 0;
@@ -96,8 +93,8 @@
       height: 100%;
     }
 
-    /* Чтобы по линиям можно было кликать */
-    #links-layer line {
+    /* чтобы по линиям можно было кликать */
+    #links-layer path {
       pointer-events: stroke;
     }
   </style>
@@ -114,15 +111,7 @@
     </div>
 
     <div class="canvas" id="canvas">
-      <!-- слой со стрелками -->
-      <svg id="links-layer">
-        <defs>
-          <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5"
-                  markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-            <path d="M 0 0 L 10 5 L 0 10 z" fill="#000"></path>
-          </marker>
-        </defs>
-      </svg>
+      <svg id="links-layer"></svg>
 
       <!-- Верхний уровень -->
       <div class="node" id="n-gd">
@@ -321,9 +310,8 @@
     let deleteArrowMode = false;
     let arrowStartNode = null;
 
-    const edges = []; // {fromId, toId, line}
+    const edges = []; // {fromId, toId, path}
 
-    // стартовая раскладка "деревом"
     function layoutDefault() {
       const w = canvas.clientWidth;
       const h = canvas.clientHeight;
@@ -340,10 +328,8 @@
         'n-sec':              {x: 0.70, y: 0.28},
         'n-office':           {x: 0.55, y: 0.28},
 
-        // закупки
         'n-pur-mgrs':         {x: 0.55, y: 0.36},
 
-        // продажи / клиенты / маркетинг / проекты
         'n-dept-regsales':    {x: 0.02, y: 0.40},
         'n-reg-mgrs':         {x: 0.02, y: 0.50},
 
@@ -362,7 +348,6 @@
         'n-dev-1c':           {x: 0.38, y: 0.62},
         'n-admin-it':         {x: 0.38, y: 0.72},
 
-        // логистика
         'n-head-opslog':      {x: 0.60, y: 0.40},
         'n-log-mgr':          {x: 0.60, y: 0.50},
         'n-log-cust':         {x: 0.60, y: 0.60},
@@ -376,7 +361,6 @@
         'n-pickers':          {x: 0.92, y: 0.60},
         'n-controllers':      {x: 0.92, y: 0.70},
 
-        // Москва / СПб
         'n-moscow':           {x: 0.05, y: 0.87},
         'n-moscow-head-atlas':{x: 0.21, y: 0.87},
         'n-moscow-sales':     {x: 0.37, y: 0.87},
@@ -391,7 +375,6 @@
         'n-spb':              {x: 0.69, y: 0.87},
         'n-spb-reg':          {x: 0.85, y: 0.87},
 
-        // аутсорсинг
         'n-outs':             {x: 0.69, y: 0.95},
         'n-outs-dep':         {x: 0.82, y: 0.95},
         'n-outs-chief':       {x: 0.69, y: 1.03},
@@ -444,7 +427,7 @@
       localStorage.setItem(storageKeyPos, JSON.stringify(data));
     }
 
-    // ----- стрелки -----
+    // ---- стрелки «скобочкой» ----
     function updateEdge(edge) {
       const from = document.getElementById(edge.fromId);
       const to = document.getElementById(edge.toId);
@@ -454,15 +437,16 @@
       const r1 = from.getBoundingClientRect();
       const r2 = to.getBoundingClientRect();
 
+      // из низа начальника в верх подчинённого
       const x1 = r1.left + r1.width / 2 - canvasRect.left;
-      const y1 = r1.top + r1.height / 2 - canvasRect.top;
+      const y1 = r1.bottom - canvasRect.top;
       const x2 = r2.left + r2.width / 2 - canvasRect.left;
-      const y2 = r2.top + r2.height / 2 - canvasRect.top;
+      const y2 = r2.top - canvasRect.top;
 
-      edge.line.setAttribute('x1', x1);
-      edge.line.setAttribute('y1', y1);
-      edge.line.setAttribute('x2', x2);
-      edge.line.setAttribute('y2', y2);
+      const midY = (y1 + y2) / 2;
+
+      const d = `M ${x1} ${y1} L ${x1} ${midY} L ${x2} ${midY} L ${x2} ${y2}`;
+      edge.path.setAttribute('d', d);
     }
 
     function updateAllEdges() {
@@ -476,26 +460,22 @@
 
     function createEdge(fromId, toId) {
       if (fromId === toId) return;
-      // не дублируем
       if (edges.some(e => e.fromId === fromId && e.toId === toId)) return;
 
-      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      line.setAttribute('stroke', '#000');
-      line.setAttribute('stroke-width', '1');
-      line.setAttribute('marker-end', 'url(#arrow)');
-      svg.appendChild(line);
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('stroke', '#000');
+      path.setAttribute('stroke-width', '1');
+      path.setAttribute('fill', 'none');
+      svg.appendChild(path);
 
-      const edge = {fromId, toId, line};
+      const edge = {fromId, toId, path};
 
-      // клик по линии — удаление при включённом режиме
-      line.addEventListener('click', (e) => {
+      path.addEventListener('click', (e) => {
         if (!deleteArrowMode) return;
         e.stopPropagation();
         const idx = edges.indexOf(edge);
-        if (idx !== -1) {
-          edges.splice(idx, 1);
-        }
-        line.remove();
+        if (idx !== -1) edges.splice(idx, 1);
+        path.remove();
         saveEdges();
       });
 
@@ -510,14 +490,12 @@
       try {
         const data = JSON.parse(saved);
         data.forEach(e => createEdge(e.fromId, e.toId));
-      } catch(e) {
-        // игнор
-      }
+      } catch(e) {}
     }
 
     function clearEdges() {
       edges.splice(0, edges.length);
-      Array.from(svg.querySelectorAll('line')).forEach(l => l.remove());
+      Array.from(svg.querySelectorAll('path')).forEach(p => p.remove());
       localStorage.removeItem(storageKeyEdges);
     }
 
@@ -528,7 +506,7 @@
 
     nodes.forEach(node => {
       node.addEventListener('pointerdown', (e) => {
-        if (arrowMode || deleteArrowMode) return; // в режимах стрелок не таскаем
+        if (arrowMode || deleteArrowMode) return;
         active = node;
         active.setPointerCapture(e.pointerId);
         const rect = active.getBoundingClientRect();
@@ -547,7 +525,6 @@
         }
       });
 
-      // клик для рисования стрелок
       node.addEventListener('click', (e) => {
         if (!arrowMode) return;
         e.stopPropagation();
@@ -622,10 +599,8 @@
       clearEdges();
     });
 
-    // обновляем стрелки при ресайзе окна
     window.addEventListener('resize', updateAllEdges);
 
-    // старт
     window.addEventListener('load', () => {
       loadPositions();
       loadEdges();
