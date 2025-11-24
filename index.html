@@ -87,24 +87,24 @@
       inset: 0;
       width: 100%;
       height: 100%;
-      pointer-events: none;
     }
 
-    #links-layer path {
+    #links-layer line {
       stroke: #000;
       stroke-width: 1;
-      fill: none;
-      pointer-events: stroke;
+      pointer-events: stroke; /* чтобы можно было кликнуть для удаления */
     }
   </style>
 </head>
 <body>
   <div class="page">
     <div class="toolbar">
-      Перетаскивайте блоки мышкой. Связи рисуются автоматически.
+      Перетаскивайте блоки мышкой.
       <button id="toggle-grid">Сетка: выкл</button>
-      <button id="toggle-links">Связи: вкл</button>
-      <button id="reset">Сбросить расположение</button>
+      <button id="draw-mode">Рисовать линии: выкл</button>
+      <button id="delete-mode">Удалять линии: выкл</button>
+      <button id="clear-lines">Очистить все линии</button>
+      <button id="reset">Сбросить расположение блоков</button>
     </div>
 
     <div class="canvas" id="canvas">
@@ -300,115 +300,147 @@
     const svg = document.getElementById('links-layer');
 
     const storageKeyPos = 'orgchart-a4-positions-v1';
+    const storageKeyLines = 'orgchart-a4-lines-v1';
 
     let gridOn = false;
-    let linksOn = true;
+    let drawMode = false;
+    let deleteMode = false;
 
-    // карта подчинённости: кто кому подчиняется
-    const parentMap = {
-      'n-komdir': 'n-gd',
-      'n-opdir': 'n-komdir',
-      'n-hrdir': 'n-gd',
-      'n-logdir': 'n-gd',
-      'n-purdir': 'n-gd',
-      'n-sec': 'n-gd',
-      'n-office': 'n-gd',
+    // -------- ЛИНИИ (ручное рисование) --------
+    let drawing = false;
+    let startX = 0;
+    let startY = 0;
+    let tempLine = null;
+    const lines = []; // {x1,y1,x2,y2, element}
 
-      'n-pur-mgrs': 'n-purdir',
-
-      'n-dept-regsales': 'n-opdir',
-      'n-reg-mgrs': 'n-dept-regsales',
-
-      'n-head-cust': 'n-opdir',
-      'n-cust-mgrs': 'n-head-cust',
-      'n-claims': 'n-head-cust',
-      'n-atlas-cust': 'n-head-cust',
-      'n-shop-mgrs': 'n-head-cust',
-
-      'n-lead-projects': 'n-opdir',
-
-      'n-head-mkt': 'n-opdir',
-      'n-spec-mkt': 'n-head-mkt',
-
-      'n-head-dig': 'n-opdir',
-      'n-dev-1c': 'n-head-dig',
-      'n-admin-it': 'n-head-dig',
-
-      'n-head-opslog': 'n-logdir',
-      'n-log-mgr': 'n-head-opslog',
-      'n-log-cust': 'n-head-opslog',
-      'n-head-warehouse': 'n-head-opslog',
-      'n-receiver': 'n-head-warehouse',
-      'n-doc-senior': 'n-head-opslog',
-      'n-doc-spec': 'n-doc-senior',
-      'n-shift-lead': 'n-head-warehouse',
-      'n-loaders': 'n-shift-lead',
-      'n-forklift': 'n-shift-lead',
-      'n-pickers': 'n-shift-lead',
-      'n-controllers': 'n-shift-lead',
-
-      'n-moscow': 'n-opdir',
-      'n-moscow-head-atlas': 'n-moscow',
-      'n-moscow-sales': 'n-moscow-head-atlas',
-      'n-moscow-manager': 'n-moscow-head-atlas',
-
-      'n-moscow-dealer-head': 'n-opdir',
-      'n-moscow-dealer-reg': 'n-moscow-dealer-head',
-
-      'n-moscow-proj-head': 'n-opdir',
-      'n-moscow-proj-reg': 'n-moscow-proj-head',
-
-      'n-spb': 'n-opdir',
-      'n-spb-reg': 'n-spb',
-
-      'n-outs': 'n-gd',
-      'n-outs-dep': 'n-outs',
-      'n-outs-chief': 'n-outs-dep',
-      'n-outs-econ': 'n-outs-chief',
-      'n-outs-hr': 'n-outs-dep',
-      'n-outs-accs': 'n-outs-chief'
-    };
-
-    // храним path для каждого childId
-    const linkPaths = {};
-
-    function createPaths() {
-      Object.keys(parentMap).forEach(childId => {
-        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        svg.appendChild(path);
-        linkPaths[childId] = path;
-      });
+    function saveLines() {
+      const data = lines.map(l => ({x1: l.x1, y1: l.y1, x2: l.x2, y2: l.y2}));
+      localStorage.setItem(storageKeyLines, JSON.stringify(data));
     }
 
-    function updateLinks() {
-      if (!linksOn) {
-        Object.values(linkPaths).forEach(p => p.setAttribute('d', ''));
-        return;
-      }
+    function loadLines() {
+      const saved = localStorage.getItem(storageKeyLines);
+      if (!saved) return;
+      try {
+        const data = JSON.parse(saved);
+        data.forEach(d => {
+          const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          line.setAttribute('x1', d.x1);
+          line.setAttribute('y1', d.y1);
+          line.setAttribute('x2', d.x2);
+          line.setAttribute('y2', d.y2);
+          svg.appendChild(line);
+          const obj = {x1: d.x1, y1: d.y1, x2: d.x2, y2: d.y2, element: line};
+          lines.push(obj);
 
+          line.addEventListener('click', (e) => {
+            if (!deleteMode) return;
+            e.stopPropagation();
+            const idx = lines.indexOf(obj);
+            if (idx !== -1) lines.splice(idx, 1);
+            line.remove();
+            saveLines();
+          });
+        });
+      } catch(e) {}
+    }
+
+    function clearLines() {
+      lines.splice(0, lines.length);
+      Array.from(svg.querySelectorAll('line')).forEach(l => l.remove());
+      localStorage.removeItem(storageKeyLines);
+    }
+
+    canvas.addEventListener('pointerdown', (e) => {
+      if (!drawMode) return;
+      const rect = canvas.getBoundingClientRect();
+      drawing = true;
+      startX = e.clientX - rect.left;
+      startY = e.clientY - rect.top;
+
+      tempLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      tempLine.setAttribute('x1', startX);
+      tempLine.setAttribute('y1', startY);
+      tempLine.setAttribute('x2', startX);
+      tempLine.setAttribute('y2', startY);
+      svg.appendChild(tempLine);
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+      if (!drawing || !tempLine) return;
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      tempLine.setAttribute('x2', x);
+      tempLine.setAttribute('y2', y);
+    });
+
+    canvas.addEventListener('pointerup', (e) => {
+      if (!drawing || !tempLine) return;
+      const rect = canvas.getBoundingClientRect();
+      const x2 = e.clientX - rect.left;
+      const y2 = e.clientY - rect.top;
+
+      tempLine.setAttribute('x2', x2);
+      tempLine.setAttribute('y2', y2);
+
+      const obj = {x1: startX, y1: startY, x2, y2, element: tempLine};
+      lines.push(obj);
+
+      tempLine.addEventListener('click', (ev) => {
+        if (!deleteMode) return;
+        ev.stopPropagation();
+        const idx = lines.indexOf(obj);
+        if (idx !== -1) lines.splice(idx, 1);
+        tempLine.remove();
+        saveLines();
+      });
+
+      saveLines();
+      drawing = false;
+      tempLine = null;
+    });
+
+    // -------- ПЕРЕТАСКИВАНИЕ БЛОКОВ --------
+    let active = null;
+    let shiftX = 0;
+    let shiftY = 0;
+
+    nodes.forEach(node => {
+      node.addEventListener('pointerdown', (e) => {
+        if (drawMode || deleteMode) return; // в режимах линий не таскаем
+        active = node;
+        active.setPointerCapture(e.pointerId);
+        const rect = active.getBoundingClientRect();
+        const canvasRect = canvas.getBoundingClientRect();
+        shiftX = e.clientX - rect.left;
+        shiftY = e.clientY - rect.top;
+        active.style.zIndex = Date.now().toString();
+      });
+
+      node.addEventListener('pointerup', (e) => {
+        if (active) {
+          active.releasePointerCapture(e.pointerId);
+          active = null;
+          savePositions();
+        }
+      });
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+      if (!active) return;
       const canvasRect = canvas.getBoundingClientRect();
+      let x = e.clientX - canvasRect.left - shiftX;
+      let y = e.clientY - canvasRect.top - shiftY;
 
-      Object.entries(parentMap).forEach(([childId, parentId]) => {
-        const parent = document.getElementById(parentId);
-        const child = document.getElementById(childId);
-        const path = linkPaths[childId];
-        if (!parent || !child || !path) return;
+      x = Math.max(0, Math.min(x, canvas.clientWidth - active.offsetWidth));
+      y = Math.max(0, Math.min(y, canvas.clientHeight - active.offsetHeight));
 
-        const r1 = parent.getBoundingClientRect();
-        const r2 = child.getBoundingClientRect();
+      active.style.left = x + 'px';
+      active.style.top = y + 'px';
+    });
 
-        const x1 = r1.left + r1.width / 2 - canvasRect.left;
-        const y1 = r1.bottom - canvasRect.top;
-        const x2 = r2.left + r2.width / 2 - canvasRect.left;
-        const y2 = r2.top - canvasRect.top;
-
-        const midY = (y1 + y2) / 2;
-
-        const d = `M ${x1} ${y1} L ${x1} ${midY} L ${x2} ${midY} L ${x2} ${y2}`;
-        path.setAttribute('d', d);
-      });
-    }
-
+    // -------- ПОЗИЦИИ БЛОКОВ --------
     function layoutDefault() {
       const w = canvas.clientWidth;
       const h = canvas.clientHeight;
@@ -488,7 +520,6 @@
         node.style.left = x + 'px';
         node.style.top = y + 'px';
       });
-      updateLinks();
     }
 
     function loadPositions() {
@@ -508,9 +539,7 @@
         });
       } catch(e) {
         layoutDefault();
-        return;
       }
-      updateLinks();
     }
 
     function savePositions() {
@@ -524,48 +553,7 @@
       localStorage.setItem(storageKeyPos, JSON.stringify(data));
     }
 
-    // перетаскивание
-    let active = null;
-    let shiftX = 0;
-    let shiftY = 0;
-
-    nodes.forEach(node => {
-      node.addEventListener('pointerdown', (e) => {
-        active = node;
-        active.setPointerCapture(e.pointerId);
-        const rect = active.getBoundingClientRect();
-        const canvasRect = canvas.getBoundingClientRect();
-        shiftX = e.clientX - rect.left;
-        shiftY = e.clientY - rect.top;
-        active.style.zIndex = Date.now().toString();
-      });
-
-      node.addEventListener('pointerup', (e) => {
-        if (active) {
-          active.releasePointerCapture(e.pointerId);
-          active = null;
-          savePositions();
-          updateLinks();
-        }
-      });
-    });
-
-    canvas.addEventListener('pointermove', (e) => {
-      if (!active) return;
-      const canvasRect = canvas.getBoundingClientRect();
-      let x = e.clientX - canvasRect.left - shiftX;
-      let y = e.clientY - canvasRect.top - shiftY;
-
-      x = Math.max(0, Math.min(x, canvas.clientWidth - active.offsetWidth));
-      y = Math.max(0, Math.min(y, canvas.clientHeight - active.offsetHeight));
-
-      active.style.left = x + 'px';
-      active.style.top = y + 'px';
-
-      updateLinks();
-    });
-
-    // кнопки
+    // -------- КНОПКИ --------
     document.getElementById('reset').addEventListener('click', () => {
       localStorage.removeItem(storageKeyPos);
       layoutDefault();
@@ -577,17 +565,33 @@
       e.target.textContent = 'Сетка: ' + (gridOn ? 'вкл' : 'выкл');
     });
 
-    document.getElementById('toggle-links').addEventListener('click', (e) => {
-      linksOn = !linksOn;
-      e.target.textContent = 'Связи: ' + (linksOn ? 'вкл' : 'выкл');
-      updateLinks();
+    document.getElementById('draw-mode').addEventListener('click', (e) => {
+      drawMode = !drawMode;
+      if (drawMode) {
+        deleteMode = false;
+        document.getElementById('delete-mode').textContent = 'Удалять линии: выкл';
+      }
+      e.target.textContent = 'Рисовать линии: ' + (drawMode ? 'вкл' : 'выкл');
     });
 
-    window.addEventListener('resize', updateLinks);
+    document.getElementById('delete-mode').addEventListener('click', (e) => {
+      deleteMode = !deleteMode;
+      if (deleteMode) {
+        drawMode = false;
+        document.getElementById('draw-mode').textContent = 'Рисовать линии: выкл';
+      }
+      e.target.textContent = 'Удалять линии: ' + (deleteMode ? 'вкл' : 'выкл');
+    });
 
+    document.getElementById('clear-lines').addEventListener('click', () => {
+      clearLines();
+    });
+
+    // старт
     window.addEventListener('load', () => {
-      createPaths();
+      layoutDefault();
       loadPositions();
+      loadLines();
     });
   </script>
 </body>
